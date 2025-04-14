@@ -29,6 +29,7 @@ import Beta from "./Beta";
 import PriceBoxPlot from "./PriceBoxPlot";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import FinBot from "./FinBot";
 
 const StockDetail = () => {
   const { name } = useParams();
@@ -151,6 +152,7 @@ const StockDetail = () => {
             <ShareholdingPieChart symbol={symbol} />
             <PriceBoxPlot symbol={symbol} />
           </div>
+
         </div>
 
         {/* Page 3: Equimeter and News */}
@@ -164,6 +166,7 @@ const StockDetail = () => {
           <button onClick={handleDownloadPDF} style={styles.downloadBtn}>📥 Download PDF</button>
         </div>
       </div>
+      <FinBot></FinBot>
     </div>
   );
 };
