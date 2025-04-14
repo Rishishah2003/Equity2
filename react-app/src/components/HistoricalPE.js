@@ -5,9 +5,11 @@ import "chart.js/auto";
 const HistoricalPE = ({ symbol }) => {
   const [peData, setPeData] = useState([]);
   const [dates, setDates] = useState([]);
+  const [loading, setLoading] = useState(false); // 👈 added
 
   useEffect(() => {
     const fetchPE = async () => {
+      setLoading(true); // 👈 start loading
       try {
         const response = await fetch(
           `http://localhost:5000/historical-pe-scrape?symbol=${symbol}`
@@ -32,12 +34,22 @@ const HistoricalPE = ({ symbol }) => {
         setPeData([]);
         setDates([]);
       }
+      setLoading(false); // 👈 stop loading
     };
 
     if (symbol) {
       fetchPE();
     }
   }, [symbol]);
+
+  if (loading) {
+    return (
+      <div style={styles.chartContainer}>
+        <h2>Historical Trailing P/E Ratio</h2>
+        <p>Loading...</p> {/* 👈 You can replace this with a spinner if preferred */}
+      </div>
+    );
+  }
 
   if (!peData.length || !dates.length) return null;
 
@@ -128,12 +140,12 @@ const styles = {
     justifyContent: "center",
     width: "85%",
     maxWidth: "1000px",
-    padding: "55px 20px 20px 20px", // Increased top padding
+    padding: "55px 20px 20px 20px",
     backgroundColor: "#fff",
     borderRadius: "8px",
     boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
     textAlign: "center",
-    margin: "10px auto 0 auto", // Matches BorrowInvest.js nicely
+    margin: "10px auto 0 auto",
   },
 };
 

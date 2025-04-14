@@ -1,143 +1,56 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
 
 const BookValue = ({ symbol }) => {
-  const [bookValueData, setBookValueData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [bookValue, setBookValue] = useState(null);
 
   useEffect(() => {
     const fetchBookValue = async () => {
+      setBookValue(null);
+      const formattedSymbol = symbol?.endsWith(".NS") ? symbol : `${symbol}.NS`;
+
       try {
-        const response = await axios.get(`http://localhost:5000/book-value?symbol=${symbol}`);
-        setBookValueData(response.data);
-        setError(null);
-      } catch (err) {
-        setError('Book Value not found');
-        console.error(err.message);
-      } finally {
-        setLoading(false);
-      }
+        const response = await fetch(`http://localhost:5000/key-statistics?symbol=${formattedSymbol}`);
+        const data = await response.json();
+        if (data?.bookValue !== undefined && data.bookValue !== null) {
+          setBookValue(data.bookValue);
+        }
+      } catch (error) {}
     };
 
-    if (symbol) {
-      fetchBookValue();
-    }
+    if (symbol) fetchBookValue();
   }, [symbol]);
 
-  if (loading) return <div style={styles.loading}>Loading Book Value...</div>;
-  if (error || !bookValueData) return null;
-
-  const cleanValue = bookValueData.bookvalue.replace(/\s+/g, ' ').trim();
+  if (bookValue === null) return null;
 
   return (
-    <div style={styles.flexItem}>
-      <div
-        style={styles.cardContainer}
-        onMouseEnter={() => setIsFlipped(true)}
-        onMouseLeave={() => setIsFlipped(false)}
-      >
-        <div
-          style={{
-            ...styles.card,
-            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          }}
-        >
-          {/* Front */}
-          <div style={{ ...styles.face, ...styles.front }}>
-            <div style={styles.title}>📚 Book Value</div>
-            <div style={styles.value}>{cleanValue}</div>
-          </div>
-
-          {/* Back */}
-          <div style={{ ...styles.face, ...styles.back }}>
-            <div style={styles.infoTitle}>What is Book Value?</div>
-            <div style={styles.infoText}>
-              Book Value represents a company's total assets minus liabilities. It’s a key valuation metric showing the real net asset value of a firm.
-            </div>
-          </div>
-        </div>
-      </div>
+    <div style={styles.card}>
+      <div style={styles.title}>Book Value</div>
+      <div style={styles.value}>₹{bookValue.toFixed(2)}</div>
     </div>
   );
 };
 
 const styles = {
-  flexItem: {
-    flex: '0 0 auto',
-    width: '280px',
-    height: '180px',
-    margin: '10px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardContainer: {
-    perspective: '1000px',
-    width: '100%',
-    height: '100%',
-  },
   card: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-    transformStyle: 'preserve-3d',
-    transition: 'transform 0.6s ease-in-out',
-  },
-  face: {
-    position: 'absolute',
-    width: '100%',
-    height: '90%',
-    borderRadius: '14px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '16px',
-    boxSizing: 'border-box',
-    border: '1px solid #ccc',
-    backfaceVisibility: 'hidden',
-  },
-  front: {
-    backgroundColor: '#ffffff',
-    color: '#333',
-    zIndex: 2,
-  },
-  back: {
-    background: 'linear-gradient(135deg, #e0f7fa 0%, #80deea 100%)',
-    transform: 'rotateY(180deg)',
-    color: '#2c3e50',
-    boxShadow: 'inset 0 0 10px rgba(0, 0, 0, 0.1)',
+    backgroundColor: "#ffffff",
+    padding: "25px 16px",
+    margin: "10px auto",
+    width: "200px",
+    borderRadius: "10px",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+    textAlign: "center",
+    fontFamily: "'Segoe UI', sans-serif",
   },
   title: {
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    marginBottom: '10px',
-    textAlign: 'center',
+    fontSize: "22px",
+    fontWeight: "750",
+    color: "#333",
+    marginBottom: "4px",
   },
   value: {
-    fontSize: '2rem',
-    fontWeight: 'bold',
-    color: '#007bff',
-    textAlign: 'center',
-  },
-  infoTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
-    marginBottom: '6px',
-    textAlign: 'center',
-  },
-  infoText: {
-    fontSize: '0.9rem',
-    textAlign: 'center',
-    lineHeight: '1.3rem',
-  },
-  loading: {
-    fontSize: '0.95rem',
-    fontStyle: 'italic',
-    color: '#666',
-    padding: '10px',
+    fontSize: "22px",
+    fontWeight: "650",
+    color: "#dc3545",
   },
 };
 

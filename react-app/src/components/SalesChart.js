@@ -1,81 +1,70 @@
 import React, { useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
-import "chart.js/auto";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from "chart.js";
+
+// Register chart.js components
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const SalesChart = ({ symbol }) => {
   const [sales, setSales] = useState([]);
   const [profit, setProfit] = useState([]);
   const [years, setYears] = useState([]);
   const [error, setError] = useState(null);
-  const [attempt, setAttempt] = useState(0);
-
-  const maxRetries = 3;
-
-  const fetchFinancialData = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/scrape/${symbol}`);
-      if (!response.ok) throw new Error("API error");
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setSales(data.sales);
-      setProfit(data.profit);
-      setYears(data.years);
-      setError(null);
-    } catch (err) {
-      console.error(`❌ Attempt ${attempt + 1} failed:`, err.message);
-      if (attempt < maxRetries - 1) {
-        setTimeout(() => setAttempt((prev) => prev + 1), 1000 * (attempt + 1)); // retry with backoff
-      } else {
-        setError("Unable to load financial data after multiple attempts.");
-      }
-    }
-  };
+  const [companyInfo, setCompanyInfo] = useState("");
 
   useEffect(() => {
+    const fetchFinancialData = async () => {
+      try {
+        const symbolWithSuffix = `${symbol}.NS`;
+        const response = await fetch(`http://localhost:5000/yfinance/${symbolWithSuffix}`);
+        const data = await response.json();
+
+        if (data.error) {
+          setError(data.error);
+        } else {
+          const reversedYears = data.years.reverse();
+          const reversedSales = data.sales.reverse().map((value) => value / 1e7); // Crores
+          const reversedProfit = data.profit.reverse().map((value) => value / 1e7); // Crores
+
+          setSales(reversedSales);
+          setProfit(reversedProfit);
+          setYears(reversedYears);
+
+          setError(null);
+        }
+      } catch (err) {
+        setError("Failed to fetch data from the backend");
+      }
+    };
+
     if (symbol) {
       fetchFinancialData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, attempt]);
+  }, [symbol]);
 
-  if (error) {
-    return <div style={{ color: "red", fontWeight: "bold" }}>{error}</div>;
-  }
-
-  if (sales.length === 0 || profit.length === 0 || years.length === 0) {
-    return null;
-  }
-
-  const calculateGrowthRate = (data) => {
-    return data.map((value, index) => {
-      if (index === 0) return 0;
-      const previousValue = data[index - 1];
-      const growthRate = ((value - previousValue) / previousValue) * 100;
-      return growthRate.toFixed(2);
-    });
+  const calculateYoYChange = (data) => {
+    return data.map((value, i) =>
+      i === 0 ? null : (((value - data[i - 1]) / data[i - 1]) * 100).toFixed(2)
+    );
   };
 
-  const calculateProfitToSalesPercentage = () =>
-    sales.map((sale, index) => (sale === 0 ? 0 : ((profit[index] / sale) * 100).toFixed(2)));
+  const salesYoY = calculateYoYChange(sales);
+  const profitYoY = calculateYoYChange(profit);
 
-  const salesGrowthRate = calculateGrowthRate(sales);
-  const profitGrowthRate = calculateGrowthRate(profit);
-  const profitToSalesPercentage = calculateProfitToSalesPercentage();
+  const calculateProfitToSalesPercentage = (salesValue, profitValue) => {
+    return ((profitValue / salesValue) * 100).toFixed(2);
+  };
 
   const chartData = {
     labels: years,
     datasets: [
       {
-        label: "Sales (in Cr)",
+        label: "Sales (in Crores)",
         data: sales,
         backgroundColor: "rgba(54, 162, 235, 0.6)",
       },
       {
-        label: "Profit (in Cr)",
+        label: "Profit (in Crores)",
         data: profit,
         backgroundColor: "rgba(255, 99, 132, 0.6)",
       },
@@ -85,29 +74,58 @@ const SalesChart = ({ symbol }) => {
   const options = {
     responsive: true,
     plugins: {
+      title: {
+        display: true,
+        text: `Sales & Profit Over the Years`,
+        font: {
+          size: 24,
+          weight: "bold",
+          family: "Arial, sans-serif",
+        },
+        color: "black",
+      },
       tooltip: {
         callbacks: {
           label: function (tooltipItem) {
             const datasetIndex = tooltipItem.datasetIndex;
             const index = tooltipItem.dataIndex;
+            const value = tooltipItem.raw;
+            let lines = [];
 
             if (datasetIndex === 0) {
-              return `${tooltipItem.dataset.label}: ${tooltipItem.raw} Cr\nGrowth: ${salesGrowthRate[index]}%\nProfit to Sales: ${profitToSalesPercentage[index]}%`;
+              // Sales Tooltip
+              lines.push(`Sales: ₹${value.toFixed(2)} Cr`);
+              if (salesYoY[index]) {
+                lines.push(`YoY Sales Change: ${salesYoY[index]}%`);
+              }
+              lines.push(`Profit to Sales: ${calculateProfitToSalesPercentage(sales[index], profit[index])}%`);
             } else if (datasetIndex === 1) {
-              return `${tooltipItem.dataset.label}: ${tooltipItem.raw} Cr\nGrowth: ${profitGrowthRate[index]}%\nProfit to Sales: ${profitToSalesPercentage[index]}%`;
+              // Profit Tooltip
+              lines.push(`Profit: ₹${value.toFixed(2)} Cr`);
+              if (profitYoY[index]) {
+                lines.push(`YoY Profit Change: ${profitYoY[index]}%`);
+              }
+              lines.push(`Profit to Sales: ${calculateProfitToSalesPercentage(sales[index], profit[index])}%`);
             }
-            return tooltipItem.raw;
+
+            return lines;
           },
         },
       },
     },
     scales: {
-      x: { beginAtZero: true },
+      x: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: "Year",
+        },
+      },
       y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: "Sales/Profit (in Cr)",
+          text: "Amount in Crores",
         },
         grid: {
           display: false,
@@ -116,29 +134,32 @@ const SalesChart = ({ symbol }) => {
     },
   };
 
+  if (error) {
+    return <div style={{ color: "red", fontWeight: "bold" }}>{error}</div>;
+  }
+
+  if (sales.length === 0 || profit.length === 0 || years.length === 0) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <div style={styles.chartContainer}>
-      <h2>Sales & Profit Over Years</h2>
+    <div
+      style={{
+        width: "45%",
+        maxWidth: "900px",
+        margin: "20px auto",
+        padding: "10px",
+        backgroundColor: "#fff",
+        borderRadius: "8px",
+        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+      }}
+    >
+      <div style={{ marginBottom: "20px", fontSize: "18px", color: "#333" }}>
+        {companyInfo}
+      </div>
       <Bar data={chartData} options={options} />
     </div>
   );
-};
-
-const styles = {
-  chartContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "85%",
-    maxWidth: "1000px",
-    padding: "20px",
-    backgroundColor: "#fff",
-    borderRadius: "8px",
-    boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
-    textAlign: "center",
-    margin: "0 auto",
-  },
 };
 
 export default SalesChart;

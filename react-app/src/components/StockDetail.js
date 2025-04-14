@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react"; // Added useRef import
 import { useParams } from "react-router-dom";
 import StockInfo from "./StockInfo";
 import StockPriceChart from "./StockPriceChart";
@@ -7,11 +7,7 @@ import BorrowInvest from "./BorrowInvest";
 import ShareholdingChange from "./ShareholdingChange";
 import HistoricalPE from "./HistoricalPE";
 import DPSChart from "./DPSChart";
-import ROCEChart from "./ROCEChart";
 import SearchBarTop from "./SearchBarTop";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import ROEChart from "./ROEChart";
 import Equimeter from "./Equimeter";
 import News from "./News";
 import PriceToBook from "./PriceToBook";
@@ -20,14 +16,28 @@ import MarketCap from "./MarketCap";
 import FaceValue from "./FaceValue";
 import HighLow52Week from "./HighLow52Week";
 import BookValue from "./BookValue";
+import EPSChart from "./EPSChart";
+import QuickRatio from "./QuickRatio";
+import CurrentRatio from "./CurrentRatio";
+import ReturnOnAssets from "./ReturnOnAssets";
+import ReturnOnEquity from "./ReturnOnEquity";
+import OperatingMargins from "./OperatingMargins";
+import TotalDebt from "./TotalDebt";
+import ProfitMargins from "./ProfitMargins";
+import ShareholdingPieChart from "./ShareholdingPieChart";
+import Beta from "./Beta";
+import PriceBoxPlot from "./PriceBoxPlot";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const StockDetail = () => {
   const { name } = useParams();
   const [symbol, setSymbol] = useState(null);
 
-  const section1Ref = useRef(null); // Page 1
-  const section2Ref = useRef(null); // Page 2
-  const section3Ref = useRef(null); // Page 3
+  const section1Ref = useRef();
+  const section2Ref = useRef();
+  const section3Ref = useRef();
+  const section4Ref = useRef();
 
   useEffect(() => {
     const fetchStockSymbol = async () => {
@@ -44,47 +54,48 @@ const StockDetail = () => {
     if (name) fetchStockSymbol();
   }, [name]);
 
-  const downloadPDF = async () => {
+  const generateCanvas = async (sectionRef) => {
+    return html2canvas(sectionRef.current, { scale: 2 });
+  };
+
+  const addCanvasToPDF = (canvas, addNewPage = false, pdf, pageWidth, pageHeight) => {
+    const imgData = canvas.toDataURL("image/png");
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    if (addNewPage) pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+  };
+
+  const handleDownloadPDF = async () => {
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    const generateCanvas = async (ref) =>
-      await html2canvas(ref, {
-        scale: 2,
-        useCORS: true,
-      });
+    // Section 1: Stock Info and Price Chart
+    const canvas1 = await generateCanvas(section1Ref);
+    addCanvasToPDF(canvas1, false, pdf, pageWidth, pageHeight); // Page 1
 
-    const addCanvasToPDF = (canvas, addNewPage = false) => {
-      const imgData = canvas.toDataURL("image/png");
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+    // Section 2: Fundamental Factors
+    const canvas2 = await generateCanvas(section2Ref);
+    addCanvasToPDF(canvas2, true, pdf, pageWidth, pageHeight); // Page 2
 
-      let heightLeft = imgHeight;
-      let position = 0;
+    // Section 3: Valuation Factors
+    const canvas3 = await generateCanvas(section3Ref);
+    addCanvasToPDF(canvas3, true, pdf, pageWidth, pageHeight); // Page 3
 
-      if (addNewPage) pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-    };
-
-    const canvas1 = await generateCanvas(section1Ref.current);
-    addCanvasToPDF(canvas1); // Page 1
-
-    const canvas2 = await generateCanvas(section2Ref.current);
-    addCanvasToPDF(canvas2, true); // Page 2
-
-    const canvas3 = await generateCanvas(section3Ref.current);
-    addCanvasToPDF(canvas3, true); // Page 3
-
-    pdf.save(`${name}-stock-details.pdf`);
+    pdf.save(`StockDetail_${name}.pdf`);
   };
 
   if (!symbol) {
@@ -93,54 +104,65 @@ const StockDetail = () => {
 
   return (
     <div>
-      {/* 🧭 Search Bar - Not included in PDF */}
       <div style={styles.searchBarWrapper}>
         <SearchBarTop />
       </div>
-
-      {/* 📄 Page 1 */}
-      <div ref={section1Ref} style={styles.container}>
-        <StockInfo stockName={name} style={styles.card} />
-        <StockPriceChart symbol={symbol} style={styles.card} />
-
-        {/* Row: PBV, PE, Market Cap */}
-        <div style={styles.row}>
-          <PriceToBook symbol={symbol} style={styles.card} />
-          <PERatio symbol={symbol} style={styles.card} />
-          <MarketCap symbol={symbol} style={styles.card} />
+      <div style={styles.container}>
+        {/* Page 1: Stock Info, Price Chart, and Fundamental Factors */}
+        <div ref={section1Ref}>
+          <StockInfo stockName={name} />
+          <StockPriceChart symbol={symbol} />
+          
+          {/* Fundamental Factors */}
+          <div style={styles.card}>
+            <h2 style={styles.sectionTitle}>📊 Fundamental Factors</h2>
+            <div style={styles.sideBySide}>
+              <ProfitMargins symbol={symbol} />
+              <TotalDebt symbol={symbol} />
+              <OperatingMargins symbol={symbol} />
+            </div>
+            <div style={styles.sideBySide}>
+              <QuickRatio symbol={symbol} />
+              <CurrentRatio symbol={symbol} />
+              <ReturnOnAssets symbol={symbol} />
+              <ReturnOnEquity symbol={symbol} />
+            </div>
+            <div style={styles.sideBySideCharts}>
+              <SalesChart symbol={symbol} />
+              <EPSChart symbol={symbol} />
+            </div>
+          </div>
         </div>
 
-        {/* Row: Book Value, Face Value, 52W High/Low */}
-        <div style={styles.row}>
-          <BookValue symbol={symbol} style={styles.card} />
-          <FaceValue symbol={symbol} style={styles.card} />
-          <HighLow52Week symbol={symbol} style={styles.card} />
+        {/* Page 2: Valuation Factors and Page 4 Contents */}
+        <div ref={section2Ref} >
+          <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>📊 Valuation Factors</h2>
+          <div style={styles.sideBySide2}>
+            <Beta symbol={symbol} />
+            <PriceToBook symbol={symbol} />
+            <BookValue symbol={symbol} />
+          </div>
+          <HistoricalPE symbol={symbol} />
+          </div>
+          
+          {/* Page 4 Contents (Shareholding Pie Chart and Price Box Plot) */}
+          <div style={styles.sideBySideCharts2}>
+            <ShareholdingPieChart symbol={symbol} />
+            <PriceBoxPlot symbol={symbol} />
+          </div>
         </div>
 
-        <SalesChart symbol={symbol} style={styles.card} />
-        <BorrowInvest symbol={symbol} style={styles.card} />
-      </div>
+        {/* Page 3: Equimeter and News */}
+        <div ref={section3Ref} style={styles.cardnewsWrapper}>
+          <Equimeter symbol={symbol} stockName={name} style={styles.cardnews} />
+          <News symbol={name} style={styles.cardnews} />
+        </div>
 
-      {/* 📄 Page 2 */}
-      <div ref={section2Ref} style={styles.container}>
-        <ShareholdingChange stockSymbol={symbol} style={styles.card} />
-        <HistoricalPE symbol={symbol} style={styles.card} />
-        <DPSChart symbol={symbol} style={styles.card} />
-      </div>
-
-      {/* 📄 Page 3 */}
-      <div ref={section3Ref} style={styles.container}>
-        <ROCEChart symbol={symbol} style={styles.card} />
-        <ROEChart symbol={symbol} style={styles.card} />
-        <Equimeter symbol={symbol} stockName={name} style={styles.card} />
-        <News symbol={symbol} style={styles.card} />
-      </div>
-
-      {/* 📥 Download Button */}
-      <div style={styles.buttonWrapper}>
-        <button onClick={downloadPDF} style={styles.downloadButton}>
-          📄 Download Report as PDF
-        </button>
+        {/* Download PDF Button - At the Bottom */}
+        <div style={styles.downloadBtnWrapper}>
+          <button onClick={handleDownloadPDF} style={styles.downloadBtn}>📥 Download PDF</button>
+        </div>
       </div>
     </div>
   );
@@ -163,21 +185,57 @@ const styles = {
     padding: "20px",
     backgroundColor: "#f7f7f7",
     justifyContent: "center",
+    minHeight: "100vh", // Ensure container takes full height
   },
-  row: {
+  sideBySide: {
     display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    width: "90%",
+    margin: "0 auto",
     gap: "20px",
+    flexWrap: "wrap",
+  },
+  sideBySide2: {
+    display: "flex",
+    justifyContent: "space-between",
+    width: "60%",
+    margin: "0 auto",
+    gap: "20px",
+    flexWrap: "wrap",
+  },
+  sideBySideCharts: {
+    display: "flex",
+    justifyContent: "space-between",
+    width: "100%",
+    margin: "0 auto",
+    gap: "20px",
+    flexWrap: "wrap",
+  },
+  sideBySideCharts2: {
+    display: "flex",
+    justifyContent: "space-between",
+    width: "70%",
+    margin: "0 auto",
+    gap: "20px",
+    flexWrap: "wrap",
   },
   card: {
-    width: "100%",
-    maxWidth: "220px",
+    flex: 1,
     padding: "20px",
     backgroundColor: "#ffffff",
     borderRadius: "12px",
     boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
     margin: "auto",
+    width: "1300px",
+  },
+  cardnews: {
+    flex: 1,
+    padding: "20px",
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+    margin: "auto",
+    width: "2000px",
   },
   loading: {
     textAlign: "center",
@@ -185,18 +243,29 @@ const styles = {
     fontWeight: "bold",
     marginTop: "20px",
   },
-  buttonWrapper: {
+  sectionTitle: {
     textAlign: "center",
-    padding: "30px 0",
+    fontSize: "36px",
+    fontWeight: "800",
+    marginBottom: "20px",
+    color: "#1a1a1a",
+    letterSpacing: "1px",
   },
-  downloadButton: {
-    padding: "10px 20px",
-    backgroundColor: "#0070f3",
+  downloadBtnWrapper: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "10px",
+    marginBottom: "20px", // Optional, to give some space before bottom
+  },
+  downloadBtn: {
+    backgroundColor: "#4CAF50",
     color: "#fff",
+    padding: "15px 30px",
     border: "none",
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "16px",
+    fontWeight: "bold",
   },
 };
 
